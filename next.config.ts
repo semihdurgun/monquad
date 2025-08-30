@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['redis']
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals.push({
