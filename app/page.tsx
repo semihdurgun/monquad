@@ -140,7 +140,9 @@ export default function Home() {
             {/* Hero Title */}
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
               <span className="bg-gradient-to-r from-white via-purple-200 to-amber-300 bg-clip-text text-transparent">
-                {getTranslation(lang, 'heroTitle')}
+                Mon
+                <img src="/assets/monquad-fav1.png" alt="MONQUAD" className="w-20 h-20 inline-block" />
+                uad
               </span>
             </h1>
 

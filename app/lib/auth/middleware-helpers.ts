@@ -3,6 +3,7 @@ import { verifyAccessToken } from './tokens';
 
 // Extract user info from request headers (set by middleware)
 export interface AuthenticatedUser {
+  userId: string;
   walletAddress: string;
   username: string;
 }
@@ -10,12 +11,14 @@ export interface AuthenticatedUser {
 export function getAuthenticatedUser(request: NextRequest): AuthenticatedUser | null {
   const username = request.headers.get('x-username');
   const walletAddress = request.headers.get('x-wallet-address');
+  const userId = request.headers.get('x-user-id');
 
-  if (!username || !walletAddress) {
+  if (!username || !walletAddress || !userId) {
     return null;
   }
 
   return {
+    userId,
     walletAddress,
     username,
   };

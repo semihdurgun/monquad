@@ -50,7 +50,6 @@ export async function getRedisClient(): Promise<RedisClientType> {
       url: finalUrl,
       socket: {
         connectTimeout: 5000,
-        commandTimeout: 5000,
         reconnectStrategy: false,
       },
     });
