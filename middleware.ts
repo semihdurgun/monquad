@@ -108,8 +108,6 @@ export async function middleware(request: NextRequest) {
     // Verify access token
     const tokenPayload = await verifyAccessTokenEdge(accessToken);
     if (!tokenPayload) {
-      console.log(`🔒 Invalid access token for protected route: ${pathname}`);
-      
       // Token is invalid, check if we can refresh
       if (refreshToken && userId) {
         console.log(`🔄 Attempting token refresh for user: ${userId}`);
@@ -131,7 +129,6 @@ export async function middleware(request: NextRequest) {
       }
 
       // No refresh token available
-      console.log(`🔒 No valid refresh token, redirecting to login`);
       
       // For API routes, return 401
       if (pathname.startsWith('/api/')) {

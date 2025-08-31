@@ -146,34 +146,41 @@ export async function POST(request: NextRequest) {
     // 15. If game is won, update player score on blockchain
     if (roundData.gameState.isWon && roundData.gameState.score > 0) {
       try {
-        console.log(`🎯 PIN Game won! Updating blockchain score: ${roundData.gameState.score}`);
+        const urls = process.env.ALLOWED_ORIGINS?.split(',') || [];
         
-        // Make internal API call to update-player
-        const updatePlayerResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/update-player`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.API_KEY || '',
-            'x-wallet-address': authenticatedUser.walletAddress,
-            'x-username': authenticatedUser.username || ''
-          },
-          body: JSON.stringify({
-            scoreAmount: roundData.gameState.score,
-            transactionAmount: 1 // 1 game completed
-          }),
-        });
+        let updatePlayerResponse;
+        let lastError;
+        
+        for (const baseUrl of urls) {
+          try {
+            updatePlayerResponse = await fetch(`${baseUrl}/api/update-player`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.API_KEY || '',
+                'x-wallet-address': authenticatedUser.walletAddress,
+                'x-username': authenticatedUser.username || ''
+              },
+              body: JSON.stringify({
+                scoreAmount: roundData.gameState.score,
+                transactionAmount: 1
+              }),
+            });
 
-        if (updatePlayerResponse.ok) {
-          const updateResult = await updatePlayerResponse.json();
-          console.log(`✅ Blockchain score updated:`, updateResult);
-        } else {
-          const errorData = await updatePlayerResponse.json();
-          console.error(`❌ Failed to update blockchain score:`, errorData);
+            if (updatePlayerResponse.ok) {
+              const updateResult = await updatePlayerResponse.json();
+              break;
+            } else {
+              const errorData = await updatePlayerResponse.json();
+              lastError = errorData;
+            }
+          } catch (error) {
+            lastError = error;
+          }
         }
-      } catch (error) {
-        console.error('❌ Error calling update-player API:', error);
-        // Don't fail the main response if blockchain update fails
-      }
+              } catch (error) {
+                console.error('❌ Error calling update-player API:', error);
+        }
     }
 
     // 16. Return result to client (without revealing secret code unless game is completed)
@@ -193,12 +200,11 @@ export async function POST(request: NextRequest) {
       response.secretCode = roundData.secretCode;
     }
 
-    console.log(`🎯 PIN Game attempt ${attemptNumber}/${roundData.gameState.maxAttempts} by wallet ${authenticatedUser.walletAddress}: ${guess} → ${guessResult.correct}C ${guessResult.close}N`);
+
 
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('❌ PIN Game check guess error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import './FishingGame.css';
+import './Pingame.css';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import Keyboard from './Keyboard'
 import Timer from './Timer';
@@ -15,7 +15,6 @@ import { getTranslation, getCurrentLanguage, Language } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
-// Server API integration for secure game management
 
 // Server API interfaces
 interface PinGameRound {
@@ -98,7 +97,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
   const [modelLoaded, setModelLoaded] = useState<boolean>(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
-  const [tubeSequenceActive, setTubeSequenceActive] = useState<boolean>(false);
   const [winLights, setWinLights] = useState<THREE.PointLight[]>([]);
   const [showSocialMenu, setShowSocialMenu] = useState<boolean>(false);
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(false);
@@ -107,14 +105,25 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
   const [originalModel, setOriginalModel] = useState<THREE.Group | null>(null);
   const [originalCameraPosition, setOriginalCameraPosition] = useState<THREE.Vector3 | null>(null);
   const [originalCameraTarget, setOriginalCameraTarget] = useState<THREE.Vector3 | null>(null);
+  const [hasSeenHowToPlay, setHasSeenHowToPlay] = useState<boolean>(false);
+  const [howToPlayPulse, setHowToPlayPulse] = useState<boolean>(false);
 
   // Refs for cleanup
   const celebrationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sequenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Set current language
+  // Set current language and check cache
   useEffect(() => {
     setCurrentLanguage(getCurrentLanguage());
+    
+    // Check if user has seen how to play before
+    const hasSeen = localStorage.getItem('monquad-has-seen-how-to-play');
+    if (hasSeen) {
+      setHasSeenHowToPlay(true);
+    } else {
+      // Start pulsing animation for how to play button
+      setHowToPlayPulse(true);
+    }
   }, []);
 
   // Server API functions
@@ -141,7 +150,7 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
       setGameStarted(true);
       setGameOver(false);
       setTimerActive(true);
-      console.log('🎮 New round started:', roundData.roundId);
+
       
     } catch (error) {
       console.error('❌ Failed to start round:', error);
@@ -152,7 +161,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
   };
 
   // Simplified validation - no ticket needed for PIN game
-
   const submitGuess = async (guessCode: string) => {
     if (!currentRound) {
       setError('No active round');
@@ -254,7 +262,7 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
 
       if (response.ok) {
         const endData = await response.json();
-        console.log('🏁 Round ended:', endData);
+
         setServerSecretCode(endData.secretCode || '');
       }
     } catch (error) {
@@ -283,9 +291,9 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
         // Clear and set the new digit
         p.clear();
         p.setDigit(digit);
-        console.log('Set digit on tube:', digit);
+
       } else {
-        console.log('Panel not found for tube index:', tubeIndex);
+
       }
       
       setGuess((prev) => {
@@ -345,7 +353,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
     
     // Add to hints array
     setHints(prev => [...prev, hint]);
-    
     // Calculate feedback text
     let feedback = '';
     if (serverResult.correct === 4) {
@@ -377,7 +384,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
       
       if (secretCode) {
         setServerSecretCode(secretCode);
-        console.log(`🔍 DEBUG - Secret Code: ${secretCode}`); // Debug için
       }
       
       if (guessResult.score) {
@@ -386,14 +392,10 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
       
       if (isWon) {
       celebrateWin(); // Start confetti and tube sequence
-        console.log(`🎉 ${getTranslation(currentLanguage, 'gameWon')} Score: ${guessResult.score} (blockchain güncellenmesi server-side yapılıyor)`);
       } else {
-        console.log(`💥 ${getTranslation(currentLanguage, 'gameLost')}`);
         endRound('completed');
       }
     }
-    
-    // Clear current guess
     resetGuess();
   };
 
@@ -406,7 +408,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
     }
     setGuess(['', '', '', '']);
     currentIndexRef.current = 0;
-    setResult('idle');
   };
 
   const resetGame = () => {
@@ -414,6 +415,11 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
     if (currentRound) {
       endRound('abandoned');
     }
+
+    if (boardModel) {
+      boardModel.visible = false;
+    }
+    setShowBoardModel(false);
     
     // Clear any running celebration timers/intervals
     if (celebrationTimeoutRef.current) {
@@ -432,7 +438,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
     setTimerActive(false); // Will be set to true when new round starts
     setHints([]); // Clear hints
     setShowConfetti(false); // Stop confetti
-    setTubeSequenceActive(false); // Stop tube sequence
     removeWinLights(); // Remove any existing lights
     setError(''); // Clear any errors
     setServerSecretCode(''); // Clear secret code
@@ -463,11 +468,13 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
   // Win celebration function
   const celebrateWin = () => {
     setShowConfetti(true);
-    setTubeSequenceActive(true);
     addWinLights(); // Add lights around pins
-    loadBoardModel(); // Load board model
+    // loadBoardModel(); // Load board model
     animateCameraVictory(); // Start camera victory animation
-    
+    if (boardModel) {
+      boardModel.visible = true;
+      setShowBoardModel(true); // UI state'ini de güncelleyin
+    }
     // Run tube sequence from 1 to 9, then 0
     let currentNumber = 1;
     const sequenceInterval = setInterval(() => {
@@ -496,7 +503,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
         // Stop confetti after 5 more seconds but keep 0,0,0,0
         celebrationTimeoutRef.current = setTimeout(() => {
           setShowConfetti(false);
-          setTubeSequenceActive(false);
           removeWinLights(); // Remove lights
           celebrationTimeoutRef.current = null;
           // Don't clear the tubes - keep 0,0,0,0
@@ -646,20 +652,22 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
       // Add loading manager for better error handling
       const loadingManager = new THREE.LoadingManager();
       loadingManager.onLoad = () => {
-        console.log('All resources loaded successfully');
+  
         setModelLoaded(true);
         setModelError(null);
       };
       loadingManager.onError = (url) => {
-        console.error('Error loading resource:', url);
+
         setModelError(`Resource loading failed: ${url}`);
       };
         
       loader.manager = loadingManager;
       
-      console.log('Starting model load...');
+
+      const modelPath = '/assets/models/pin_without_board.glb'
+      
       loader.load(
-        '/assets/models/pin_without_board.glb',
+        modelPath,
         (gltf) => {
           const model = gltf.scene;
           
@@ -674,8 +682,7 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             obj.castShadow = true; 
             obj.receiveShadow = true; 
           });
-          console.log(`Total objects in model: ${totalObjects}`);
-          console.log(`Number objects found: ${numObjects}`);
+
 
           const box = new THREE.Box3().setFromObject(model);
           const size = new THREE.Vector3();
@@ -828,16 +835,50 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
               });
             };
           } catch (err) { 
-            console.error('Failed to build panels from model', err);
+            // Panel oluşturma hatası
             setModelError(`Panel creation failed: ${err}`);
           }
         },
         (progress) => {
-          console.log('Loading progress:', (progress.loaded / progress.total * 100).toFixed(2) + '%');
+  
         },
         (error) => { 
-          console.error('pin.glb yüklenirken hata:', error);
+
           setModelError(`Model loading failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      );
+
+      loader.load(
+        '/assets/models/board_compressed.glb',
+        (gltf) => {
+          const victoryBoard = gltf.scene;
+      
+          const box = new THREE.Box3().setFromObject(victoryBoard);
+          const size = new THREE.Vector3();
+          const center = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(center);
+          victoryBoard.position.sub(center);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          if (maxDim > 0 && maxDim !== 1) {
+              const scale = window.innerWidth < 768 ? 0.8 / maxDim : 2.18 / maxDim;
+              victoryBoard.scale.setScalar(scale);
+          }
+      
+          // Başlangıçta görünmez yap
+          victoryBoard.visible = false; 
+      
+          // State'e veya ref'e kaydedin
+          setBoardModel(victoryBoard);
+      
+          // Sahneye ekleyin (ama hala görünmez)
+          if (sceneRef.current) {
+              sceneRef.current.add(victoryBoard);
+          }
+        },
+        undefined,
+        (error) => {
+          console.error('Zafer panosu modeli yüklenemedi:', error);
         }
       );
       window.addEventListener('resize', onWindowResize);
@@ -863,66 +904,66 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
   }, []);
 
   // Load board model function
-  const loadBoardModel = () => {
-    if (!sceneRef.current) return;
+  // const loadBoardModel = () => {
+  //   if (!sceneRef.current) return;
     
-    const loader = new GLTFLoader();
-    loader.load(
-      '/assets/models/board.glb',
-      (gltf) => {
-        const model = gltf.scene;
+  //   const loader = new GLTFLoader();
+  //   loader.load(
+  //     '/assets/models/board_compressed.glb',
+  //     (gltf) => {
+  //       const model = gltf.scene;
         
-        // Scale and position the board model
-        const box = new THREE.Box3().setFromObject(model);
-        const size = new THREE.Vector3();
-        const center = new THREE.Vector3();
-        box.getSize(size);
-        box.getCenter(center);
-        model.position.sub(center);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        if (maxDim > 0 && maxDim !== 1) {
-          const scale = window.innerWidth < 768 ? 0.6 / maxDim : 2.18 / maxDim;
-          model.scale.setScalar(scale);
-        }
+  //       // Scale and position the board model
+  //       const box = new THREE.Box3().setFromObject(model);
+  //       const size = new THREE.Vector3();
+  //       const center = new THREE.Vector3();
+  //       box.getSize(size);
+  //       box.getCenter(center);
+  //       model.position.sub(center);
+  //       const maxDim = Math.max(size.x, size.y, size.z);
+  //       if (maxDim > 0 && maxDim !== 1) {
+  //         const scale = window.innerWidth < 768 ? 0.8 / maxDim : 2.18 / maxDim;
+  //         model.scale.setScalar(scale);
+  //       }
         
-        // Add emissive materials to numbers
-        model.traverse((obj) => {
-          const mesh = obj as THREE.Mesh;
-          const mat = (mesh.material as unknown) as THREE.Material | THREE.Material[];
-          const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
-          mats.forEach((m) => {
-            const ms = m as THREE.MeshStandardMaterial;
-            if ((ms as any).emissive !== undefined) {
-              if (obj.name.toLowerCase().startsWith('num') || (ms as any).emissiveMap) {
-                if (ms.emissive.equals(new THREE.Color(0x000000))) {
-                  ms.emissive = new THREE.Color(0xff6a00);
-                }
-                (ms as any).emissiveIntensity = 2.2;
-                ms.needsUpdate = true;
-              }
-            }
-          });
-        });
+  //       // Add emissive materials to numbers
+  //       model.traverse((obj) => {
+  //         const mesh = obj as THREE.Mesh;
+  //         const mat = (mesh.material as unknown) as THREE.Material | THREE.Material[];
+  //         const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
+  //         mats.forEach((m) => {
+  //           const ms = m as THREE.MeshStandardMaterial;
+  //           if ((ms as any).emissive !== undefined) {
+  //             if (obj.name.toLowerCase().startsWith('num') || (ms as any).emissiveMap) {
+  //               if (ms.emissive.equals(new THREE.Color(0x000000))) {
+  //                 ms.emissive = new THREE.Color(0xff6a00);
+  //               }
+  //               (ms as any).emissiveIntensity = 2.2;
+  //               ms.needsUpdate = true;
+  //             }
+  //           }
+  //         });
+  //       });
         
-        setBoardModel(model);
-        if (sceneRef.current) {
-          sceneRef.current.add(model);
-        }
-        setShowBoardModel(true);
+  //       setBoardModel(model);
+  //       if (sceneRef.current) {
+  //         sceneRef.current.add(model);
+  //       }
+  //       setShowBoardModel(true);
         
-        // Add lights around the board model
-        setTimeout(() => {
-          addWinLights();
-        }, 100);
-      },
-      (progress) => {
-        console.log('Board model loading progress:', (progress.loaded / progress.total * 100).toFixed(2) + '%');
-      },
-      (error) => {
-        console.error('Board model loading failed:', error);
-      }
-    );
-  };
+  //       // Add lights around the board model
+  //       setTimeout(() => {
+  //         addWinLights();
+  //       }, 100);
+  //     },
+  //     (progress) => {
+
+  //     },
+  //     (error) => {
+
+  //     }
+  //   );
+  // };
 
   // Camera victory animation
   const animateCameraVictory = () => {
@@ -1069,13 +1110,13 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
           }}
         >
           <svg 
-            width="24" 
-            height="24" 
+            width="20" 
+            height="20" 
             viewBox="0 0 24 24" 
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            style={{ width: '24px', height: '24px' }}
+            style={{ width: '20px', height: '20px' }}
           >
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
@@ -1087,21 +1128,30 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
 
         {/* How to Play Icon */}
         <button
-          onClick={() => setShowHowToPlay(!showHowToPlay)}
+          onClick={() => {
+            setShowHowToPlay(!showHowToPlay);
+            if (!hasSeenHowToPlay) {
+              localStorage.setItem('monquad-has-seen-how-to-play', 'true');
+              setHasSeenHowToPlay(true);
+              setHowToPlayPulse(false);
+            }
+          }}
           title={getTranslation(currentLanguage, 'howToPlayTooltip')}
           style={{
-            width: window.innerWidth < 768 ? '35px' : '45px', // Mobile: smaller
-            height: window.innerWidth < 768 ? '35px' : '45px', // Mobile: smaller
+            width: window.innerWidth < 768 ? '35px' : '45px',
+            height: window.innerWidth < 768 ? '35px' : '45px',
             borderRadius: '50%',
-            background: 'rgba(0,0,0,0.7)',
-            border: '2px solid rgba(255,255,255,0.3)',
+            background: howToPlayPulse ? 'linear-gradient(135deg, #9C27B0, #7B1FA2)' : 'rgba(0,0,0,0.7)',
+            border: howToPlayPulse ? '2px solid #9C27B0' : '2px solid rgba(255,255,255,0.3)',
             color: '#fff',
-            fontSize: window.innerWidth < 768 ? '16px' : '20px', // Mobile: smaller font
+            fontSize: window.innerWidth < 768 ? '16px' : '20px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.3s ease',
+            animation: howToPlayPulse ? 'pulse 2s infinite' : 'none',
+            boxShadow: howToPlayPulse ? '0 0 20px rgba(156, 39, 176, 0.6)' : 'none'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.1)';
@@ -1127,56 +1177,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             </g>
           </svg>
         </button>
-
-        {/* Social Media/X Icon */}
-        <div style={{ position: 'relative' }} data-social-menu>
-          <button
-            onClick={() => {
-              window.open('https://x.com/semih_durgun', '_blank');
-            }}
-            style={{
-              width: window.innerWidth < 768 ? '35px' : '45px', // Mobile: smaller
-              height: window.innerWidth < 768 ? '35px' : '45px', // Mobile: smaller
-              borderRadius: '50%',
-              background: showSocialMenu ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'rgba(0,0,0,0.7)',
-              border: showSocialMenu ? '2px solid #667eea' : '2px solid rgba(255,255,255,0.3)',
-              color: '#fff',
-              fontSize: window.innerWidth < 768 ? '14px' : '18px', // Mobile: smaller font
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-              fontFamily: 'Arial, sans-serif',
-              fontWeight: 'bold',
-              boxShadow: showSocialMenu ? '0 4px 15px rgba(102, 126, 234, 0.4)' : 'none'
-            }}
-            onMouseEnter={(e) => {
-              if (!showSocialMenu) {
-                e.currentTarget.style.transform = 'scale(1.1)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.6)';
-                e.currentTarget.style.background = 'rgba(0,0,0,0.8)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!showSocialMenu) {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-                e.currentTarget.style.background = 'rgba(0,0,0,0.7)';
-              }
-            }}
-          >
-            <svg 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="currentColor"
-              style={{ width: '20px', height: '20px' }}
-            >
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          </button>
-        </div>
 
         {/* Language Icon */}
         <div style={{ position: 'relative' }}>
@@ -1300,7 +1300,6 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
           justifyContent: 'center',
           zIndex: 2000,
           animation: 'fadeIn 0.3s ease-out',
-          padding: window.innerHeight < 1000 ? '20px' : '0'
         }}>
           <div style={{
             background: 'rgba(20,20,20,0.95)',
@@ -1308,8 +1307,8 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             borderRadius: '12px',
             padding: '40px',
             maxWidth: '600px',
-            width: '90%',
-            maxHeight: window.innerHeight < 1000 ? '80vh' : 'auto',
+            width: '100%',
+            height: '100%',
             overflowY: window.innerHeight < 1000 ? 'auto' : 'visible',
             marginTop: '50px',
             border: '1px solid rgba(255,255,255,0.2)',
@@ -1424,13 +1423,16 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                 <div style={{
                   width: '60px',
                   height: '60px',
+                  minWidth: '60px',
+                  minHeight: '60px',
                   borderRadius: '50%',
                   border: '2px solid rgba(255,255,255,0.5)',
                   background: 'rgba(255,255,255,0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '4px'
+                  gap: '3px',
+                  flexShrink: 0
                 }}>
                   {/* No dots - all wrong */}
                 </div>
@@ -1447,15 +1449,18 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                 gap: '20px'
               }}>
                 <div style={{
-                  width: '74px',
+                  width: '60px',
                   height: '60px',
+                  minWidth: '60px',
+                  minHeight: '60px',
                   borderRadius: '50%',
                   border: '2px solid rgba(255,255,255,0.5)',
                   background: 'rgba(255,255,255,0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '4px'
+                  gap: '3px',
+                  flexShrink: 0
                 }}>
                   <div style={{
                     width: '8px',
@@ -1485,13 +1490,16 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                 <div style={{
                   width: '60px',
                   height: '60px',
+                  minWidth: '60px',
+                  minHeight: '60px',
                   borderRadius: '50%',
                   border: '2px solid rgba(255,255,255,0.5)',
                   background: 'rgba(255,255,255,0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '3px'
+                  gap: '3px',
+                  flexShrink: 0
                 }}>
                   <div style={{
                     width: '8px',
@@ -1593,7 +1601,28 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
               textAlign: 'center',
               marginBottom: '25px'
             }}>
-              {getTranslation(currentLanguage, 'madeBy')}
+              <button
+                onClick={() => {
+                  window.open('https://x.com/semih_durgun', '_blank');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#666',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  transition: 'color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#9C27B0';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#666';
+                }}
+              >
+                {getTranslation(currentLanguage, 'madeBy')}
+              </button>
             </div>
           </div>
         </div>
@@ -1606,30 +1635,28 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
         language={currentLanguage}
       />
 
-      {/* 3D Container - Fixed to top */}
       <div ref={containerRef} id="container" style={{ 
         width: '100%', 
-        height: '70%', // Mobile: 50%, Desktop: 70%
+        height: window.innerHeight < 850 ? '45%' : (window.innerWidth < 768 ? '50%' : '70%'),
         position: 'absolute',
         top: 0,
         left: 0
       }} />
       
-      {/* Bottom Section - Attempts and Keyboard */}
       <div style={{
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        height: window.innerWidth < 768 ? '70%' : '30%', // Mobile: 50%, Desktop: 30%
+        height: window.innerHeight < 850 ? '90%' : (window.innerWidth < 768 ? '50%' : '30%'),
         display: 'flex',
-        flexDirection: window.innerWidth < 768 ? 'column' : 'row', // Mobile: column, Desktop: row
+        flexDirection: window.innerWidth < 768 ? 'column' : 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: window.innerWidth < 768 ? '1rem' : '8rem', // Mobile: smaller gap
-        padding: window.innerWidth < 768 ? '1rem' : '18rem', // Mobile: smaller padding
+        gap: window.innerHeight < 850 ? '0.5rem' : (window.innerWidth < 768 ? '1rem' : '8rem'),
+        padding: window.innerHeight < 850 ? '0.5rem' : (window.innerWidth < 768 ? '1rem' : '18rem'),
         fontFamily: 'Lucida Console, Courier New, monospace',
-        pointerEvents: 'none' // Allow mouse events to pass through to 3D scene
+        pointerEvents: 'none'
       }}>
         
         {/* Left Side - Attempts */}
@@ -1637,12 +1664,12 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
           display: 'flex', 
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '15px',
-          minWidth: window.innerWidth < 768 ? 'auto' : '300px', // Mobile: auto width
-          marginRight: window.innerWidth < 768 ? '0' : '40px', // Mobile: no margin
+          gap: window.innerHeight < 850 ? '8px' : '15px',
+          minWidth: window.innerWidth < 768 ? 'auto' : '300px',
+          marginRight: window.innerWidth < 768 ? '0' : '40px',
           fontFamily: 'Lucida Console, Courier New, monospace',
-          width: window.innerWidth < 768 ? '100%' : 'auto', // Mobile: full width
-          pointerEvents: 'auto' // Make attempts section interactive
+          width: window.innerWidth < 768 ? '100%' : 'auto',
+          pointerEvents: 'auto'
         }}>
           <div style={{
             display: 'flex',
@@ -1657,7 +1684,7 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
           {/* Attempts Grid */}
           <div style={{ 
             display: 'flex', 
-            gap: '10px',
+            gap: window.innerHeight < 850 ? '6px' : '10px',
             alignItems: 'flex-start',
             fontFamily: 'Lucida Console, Courier New, monospace'
           }}>
@@ -1665,13 +1692,13 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column',
-              gap: '8px',
+              gap: window.innerHeight < 850 ? '4px' : '8px',
               fontFamily: 'Lucida Console, Courier New, monospace'
             }}>
               {Array.from({ length: 8 }, (_, rowIndex) => (
                 <div key={rowIndex} style={{ 
                   display: 'flex', 
-                  gap: '6px'
+                  gap: window.innerHeight < 850 ? '4px' : '6px'
                 }}>
                   {Array.from({ length: 4 }, (_, colIndex) => {
                     const attempt = attempts[rowIndex];
@@ -1689,15 +1716,15 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                     
                     return (
                       <div key={colIndex} style={{ 
-                        width: window.innerWidth < 768 ? '40px' : '60px', // Mobile: smaller
-                        height: window.innerWidth < 768 ? '40px' : '60px', // Mobile: smaller
-                        borderRadius: '8px', 
+                        width: window.innerHeight < 850 ? '32px' : (window.innerWidth < 768 ? '40px' : '60px'),
+                        height: window.innerHeight < 850 ? '32px' : (window.innerWidth < 768 ? '40px' : '60px'),
+                        borderRadius: '6px', 
                         background: isCurrentCell ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.3)',
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center', 
                         fontWeight: '700', 
-                        fontSize: window.innerWidth < 768 ? '1rem' : '1.3rem', // Mobile: smaller font
+                        fontSize: window.innerHeight < 850 ? '0.8rem' : (window.innerWidth < 768 ? '1rem' : '1.3rem'),
                         border: isCurrentCell ? '2px solidrgb(101, 100, 120)' : '1px solid rgba(255,255,255,0.3)',
                         color: '#fff',
                         transition: 'all 0.2s ease',
@@ -1723,8 +1750,8 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column',
-              gap: '8px',
-              marginLeft: '10px',
+              gap: window.innerHeight < 850 ? '4px' : '8px',
+              marginLeft: window.innerHeight < 850 ? '6px' : '10px',
               fontFamily: 'Lucida Console, Courier New, monospace'
             }}>
               {Array.from({ length: 8 }, (_, rowIndex) => {
@@ -1733,8 +1760,8 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                 
                 return (
                   <div key={rowIndex} style={{ 
-                    width: window.innerWidth < 768 ? '40px' : '60px', // Mobile: smaller
-                    height: window.innerWidth < 768 ? '40px' : '60px', // Mobile: smaller
+                    width: window.innerHeight < 850 ? '32px' : (window.innerWidth < 768 ? '40px' : '60px'),
+                    height: window.innerHeight < 850 ? '32px' : (window.innerWidth < 768 ? '40px' : '60px'),
                     borderRadius: '50%', 
                     border: '2px solid rgba(255,255,255,0.8)',
                     background: 'rgba(255,255,255,0.1)',
@@ -1742,21 +1769,21 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                     alignItems: 'center', 
                     justifyContent: 'center',
                     position: 'relative',
-                    gap: '2px'
+                    gap: window.innerHeight < 850 ? '1px' : '2px'
                   }}>
                     {hint && [...hint].map((sign, j) => {
                       switch(sign) {
                         case "+":
                           return <div key={j} style={{
-                            width: window.innerWidth < 768 ? '6px' : '9px', // Mobile: smaller
-                            height: window.innerWidth < 768 ? '6px' : '9px', // Mobile: smaller
+                            width: window.innerHeight < 850 ? '4px' : (window.innerWidth < 768 ? '6px' : '9px'),
+                            height: window.innerHeight < 850 ? '4px' : (window.innerWidth < 768 ? '6px' : '9px'),
                             borderRadius: '50%',
                             border: '2px solid #9c27b0'
                           }} />;
                         case "-":
                           return <div key={j} style={{
-                            width: window.innerWidth < 768 ? '6px' : '9px', // Mobile: smaller
-                            height: window.innerWidth < 768 ? '6px' : '9px', // Mobile: smaller
+                            width: window.innerHeight < 850 ? '4px' : (window.innerWidth < 768 ? '6px' : '9px'),
+                            height: window.innerHeight < 850 ? '4px' : (window.innerWidth < 768 ? '6px' : '9px'),
                             borderRadius: '50%',
                             border: '2px solid #FFC107'
                           }} />;
@@ -1770,7 +1797,7 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             </div>
           </div>
           
-          {result !== 'idle' && !isLoading && (
+          {/* {result !== 'idle' && !isLoading && (
             <div style={{ 
               textAlign: 'center',
               fontWeight: '600',
@@ -1780,7 +1807,7 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             }}>
               {result === 'correct' ? getTranslation(currentLanguage, 'correct') : getTranslation(currentLanguage, 'wrong')}
             </div>
-          )}
+          )} */}
         </div>
         
         {/* Right Side - Keyboard or Game Results */}
@@ -1794,15 +1821,22 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
         }}>
           {gameOver ? (
             /* Simple Game Over Modal */
-            <div style={{ 
-              pointerEvents: 'auto',
-              textAlign: 'center',
-              padding: '30px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              minWidth: '300px',
-              maxWidth: '350px'
-            }}>
+            <div 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              style={{ 
+                pointerEvents: 'auto',
+                textAlign: 'center',
+                padding: '30px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                minWidth: '300px',
+                maxWidth: '350px',
+                position: 'relative',
+                zIndex: 2001
+              }}>
               {/* Result Title */}
               <div style={{
                 fontSize: '24px',
@@ -1835,18 +1869,13 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
                 </div>
               )}
               
-              {/* Attempts Used */}
-              <div style={{
-                fontSize: '14px',
-                color: '#999',
-                marginBottom: '25px'
-              }}>
-                {currentAttempt} / 8 deneme kullanıldı
-              </div>
-              
               {/* New Game Button */}
               <button 
-                onClick={resetGame} 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  resetGame();
+                }} 
                 style={{ 
                   padding: '12px 24px',
                   background: '#9c27b0',
@@ -1908,6 +1937,21 @@ const PinGame: React.FC<PinGameProps> = ({ accountAddress, user, hasUsername }) 
             to { 
               opacity: 1;
               transform: translateY(0);
+            }
+          }
+          
+          @keyframes pulse {
+            0% {
+              transform: scale(1);
+              box-shadow: 0 0 20px rgba(156, 39, 176, 0.6);
+            }
+            50% {
+              transform: scale(1.1);
+              box-shadow: 0 0 30px rgba(156, 39, 176, 0.8);
+            }
+            100% {
+              transform: scale(1);
+              box-shadow: 0 0 20px rgba(156, 39, 176, 0.6);
             }
           }
         `}
