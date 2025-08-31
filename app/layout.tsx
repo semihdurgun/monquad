@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monquad",
+  title: "MonQuad",
   description: "MONQUAD on Monad Games",
   icons: {
-    icon: "/assets/monad_logo.png",
+    icon: "/assets/monquad-fav1.png",
   },
   openGraph: {
-    images: "/assets/monad_logo.png",
+    images: "/assets/monquad-fav1.png",
   },
   twitter: {
     card: "summary_large_image",

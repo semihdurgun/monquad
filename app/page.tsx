@@ -147,7 +147,7 @@ export default function Home() {
             </h1>
 
             {/* Hero Description */}
-            <p className="text-xl text-purple-100/80 mb-12 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-purple-100/80 mb-12 max-w-2xl mx-auto leading-relaxed hidden md:block">
               {getTranslation(lang, 'heroDescription')}
             </p>
 

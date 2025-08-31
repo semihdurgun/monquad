@@ -18,7 +18,6 @@ export default function Page() {
   // Redirect to home if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      console.log('🔒 Not authenticated, redirecting to home...')
       router.push('/')
     }
   }, [isAuthenticated, isLoading, router])
@@ -56,7 +55,7 @@ export default function Page() {
         fontSize: '18px'
       }}>
         <div>
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>🔒 Authentication required</div>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>Authentication required</div>
           <div style={{ textAlign: 'center', fontSize: '14px', opacity: 0.7 }}>Redirecting to login...</div>
         </div>
       </div>

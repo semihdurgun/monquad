@@ -128,19 +128,19 @@ export function multiTierRateLimit(clientId: string, request?: NextRequest): Rat
   const now = Date.now();
   
   // Tier 1: Per-minute limit
-  const minuteLimit = rateLimit(clientId, { maxRequests: 10, windowMs: 60 * 1000 }, request);
+  const minuteLimit = rateLimit(clientId, { maxRequests: 60, windowMs: 60 * 1000 }, request);
   if (!minuteLimit.allowed) {
     return minuteLimit;
   }
 
   // Tier 2: Per-hour limit
-  const hourLimit = rateLimit(clientId, { maxRequests: 100, windowMs: 60 * 60 * 1000 }, request);
+  const hourLimit = rateLimit(clientId, { maxRequests: 600, windowMs: 60 * 60 * 1000 }, request);
   if (!hourLimit.allowed) {
     return hourLimit;
   }
 
   // Tier 3: Per-day limit
-  const dayLimit = rateLimit(clientId, { maxRequests: 1000, windowMs: 24 * 60 * 60 * 1000 }, request);
+  const dayLimit = rateLimit(clientId, { maxRequests: 8000, windowMs: 24 * 60 * 60 * 1000 }, request);
   if (!dayLimit.allowed) {
     return dayLimit;
   }
@@ -173,7 +173,7 @@ export function userAgentBasedRateLimit(request: NextRequest): RateLimitResult {
   
   // Stricter limits for suspicious user agents
   const isSuspicious = /bot|crawler|spider|scraper/i.test(userAgent);
-  const maxRequests = isSuspicious ? 5 : 10;
+  const maxRequests = isSuspicious ? 15 : 30;
   
   return rateLimit(clientId, { maxRequests, windowMs: 60 * 1000 }, request);
 }
